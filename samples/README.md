@@ -20,17 +20,20 @@ Esta carpeta contiene muestras de recibos reales que puedes usar para probar tu 
 ## Qué Esperar
 
 ### panama-receipt.png
+
 - Recibo completo con información de vendedor
 - Montos, subtotal, impuestos
 - Información de pago
 - Datos de facturación
 
 ### Ingreso-Derma.jpg
+
 - Comprobante de ingreso/servicio
 - Detalles de concepto de pago
 - Monto e información fiscal
 
 ### PDF-TEST.pdf
+
 - Documento PDF con información de transacción
 - Prueba la capacidad de Tesseract para procesar PDFs
 
@@ -45,7 +48,7 @@ Esta carpeta contiene muestras de recibos reales que puedes usar para probar tu 
 ## Agregar Más Muestras
 
 Si quieres agregar más recibos para pruebas:
+
 1. Coloca las imágenes/PDFs en esta carpeta
 2. Actualiza este README con descripciones
 3. Prueba tu implementación con cada uno
-

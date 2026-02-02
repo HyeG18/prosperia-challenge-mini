@@ -242,6 +242,7 @@ Probaremos tu implementación con:
 - Casos límite (campos faltantes, formatos inusuales)
 
 **Muestras Incluidas:** En la carpeta `samples/` encontrarás:
+
 - `panama-receipt.png` - Recibo de Panamá en PNG
 - `Ingreso-Derma.jpg` - Comprobante de ingreso en JPG
 - `PDF-TEST.pdf` - Documento de prueba en PDF
