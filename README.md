@@ -1,4 +1,4 @@
-# Mini Prosperia Challenge – Para Internos 🎓
+# Mini Prosperia Challenge 🎓
 
 ¡Bienvenido al **Mini Prosperia Challenge**! Este es un desafío simplificado a nivel de pasantía donde construirás un sistema de OCR y extracción de datos de recibos.
 
@@ -15,22 +15,23 @@ Crearás un mini gestor de gastos que:
 3. **Analiza datos estructurados** como montos, nombres de vendedores y fechas
 4. **Muestra resultados** en un formato limpio
 
-**¡Eso es!** Sin base de datos, sin relé de IA, sin integraciones complejas. Extracción y análisis de texto puro.
-
 ---
 
 ## 🎯 Tareas Principales (marcadas con `TODO:` en el código)
 
-### 1. **Implementación de Tesseract OCR** 
+### 1. **Implementación de Tesseract OCR**
+
 📁 `src/services/ocr.service.ts` → `TesseractOcr.extractText()`
 
 Extrae texto sin procesar de una imagen/PDF:
+
 - Usa la biblioteca `Tesseract.js`
 - Soporta idiomas: `eng+spa` (Inglés + Español)
 - Maneja tanto imágenes como PDFs
 - Retorna el texto extraído
 
 **Pista:**
+
 ```typescript
 const result = await Tesseract.recognize(imagePath, 'eng+spa');
 return result.data.text;
@@ -39,38 +40,39 @@ return result.data.text;
 ---
 
 ### 2. **Analizador de Datos de Recibos**
+
 📁 `src/services/parser.service.ts` → `ReceiptParser.parse()`
 
 Extrae datos estructurados del texto sin procesar del OCR:
 
 ```typescript
 interface ReceiptData {
-  rawText: string;              // Texto original extraído
-  amount?: number;              // Monto total (requerido)
-  subtotalAmount?: number;      // Subtotal antes del impuesto
-  taxAmount?: number;           // Monto del impuesto
-  taxPercentage?: number;       // Porcentaje de impuesto (ej: 10, 16)
-  vendorName?: string;          // Nombre de la tienda/vendedor
-  invoiceNumber?: string;       // Número de factura o recibo
-  date?: string;                // Fecha (cualquier formato está bien)
+  rawText: string; // Texto original extraído
+  amount?: number; // Monto total (requerido)
+  subtotalAmount?: number; // Subtotal antes del impuesto
+  taxAmount?: number; // Monto del impuesto
+  taxPercentage?: number; // Porcentaje de impuesto (ej: 10, 16)
+  vendorName?: string; // Nombre de la tienda/vendedor
+  invoiceNumber?: string; // Número de factura o recibo
+  date?: string; // Fecha (cualquier formato está bien)
 }
 ```
 
 **Técnicas que puedes usar:**
+
 - **Expresiones regulares** para encontrar patrones:
   - `total.*?\$?([\d,]+\.?\d*)/i` → Coincide con montos
   - `invoice\s*#?\s*(\w+)/i` → Coincide con números de factura
   - `\d{1,2}[/-]\d{1,2}[/-]\d{2,4}` → Coincide con fechas
-  
 - **Coincidencia de palabras clave:**
   - Busca "TOTAL", "SUBTOTAL", "TAX", "IMPUESTO", "FACTURA"
-  
 - **Heurística:**
   - El monto más grande = total
   - El nombre del vendedor generalmente está al principio
   - Múltiples números con símbolo de moneda = montos
 
 **Ejemplo de enfoque:**
+
 ```typescript
 const totalMatch = rawText.match(/total.*?\$?([\d,]+\.?\d*)/i);
 if (totalMatch) {
@@ -81,6 +83,7 @@ if (totalMatch) {
 ---
 
 ### 3. **Endpoint de Carga de Recibos**
+
 📁 `src/routes/receipts.routes.ts` → `POST /api/receipts`
 
 Implementa el manejador de carga de archivos:
@@ -93,6 +96,7 @@ Implementa el manejador de carga de archivos:
 6. ✅ Retorna los datos analizados como JSON
 
 **Formato de respuesta:**
+
 ```json
 {
   "id": "uuid-aqui",
@@ -112,7 +116,8 @@ Implementa el manejador de carga de archivos:
 ## 🚀 Inicio Rápido
 
 ### Prerrequisitos
-- Node.js 18+ 
+
+- Node.js 18+
 - npm o yarn
 
 ### Instalación
@@ -136,17 +141,20 @@ El servidor se iniciará en `http://localhost:3000`
 ### Probando la API
 
 **1. Vía Interfaz Web:**
+
 - Abre `http://localhost:3000` en tu navegador
 - Carga una imagen/PDF de recibo
 - Ve los datos extraídos mostrados
 
 **2. Vía cURL:**
+
 ```bash
 curl -X POST http://localhost:3000/api/receipts \
   -F "file=@recibo.jpg"
 ```
 
 **3. Vía Postman:**
+
 - POST a `http://localhost:3000/api/receipts`
 - Body: form-data con clave `file` y tu imagen
 
@@ -183,10 +191,12 @@ public/
 ## 🔧 Proveedores Disponibles
 
 ### Proveedor OCR
+
 - **`tesseract`** (default) → Usa Tesseract OCR real
 - **`mock`** → Usa OCR falso para pruebas (retorna texto de muestra)
 
 Establécelo vía `.env`:
+
 ```
 OCR_PROVIDER=tesseract
 ```
@@ -231,7 +241,12 @@ Probaremos tu implementación con:
 - Varios tipos de archivo (PNG, JPG, PDF)
 - Casos límite (campos faltantes, formatos inusuales)
 
-**Recibo de ejemplo:** Ver `public/index.html` para campos de extracción de muestra.
+**Muestras Incluidas:** En la carpeta `samples/` encontrarás:
+- `panama-receipt.png` - Recibo de Panamá en PNG
+- `Ingreso-Derma.jpg` - Comprobante de ingreso en JPG
+- `PDF-TEST.pdf` - Documento de prueba en PDF
+
+Prueba tu implementación cargando estos archivos a través de la interfaz web.
 
 ---
 
@@ -282,9 +297,6 @@ Al completar este desafío, aprenderás:
 ---
 
 ## ❓ Preguntas Frecuentes
-
-**P: ¿Puedo usar IA/OpenAI?**  
-R: No para este desafío. ¡Esto es sobre habilidades de análisis central!
 
 **P: ¿Puedo usar una base de datos?**  
 R: No requerido. El almacenamiento en memoria está bien.

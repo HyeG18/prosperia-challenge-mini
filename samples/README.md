@@ -1,100 +1,51 @@
-# Sample Receipts for Testing
+# Muestras de Recibos para Pruebas
 
-This folder contains sample receipt images you can use to test your OCR implementation.
+Esta carpeta contiene muestras de recibos reales que puedes usar para probar tu implementación de OCR.
 
-## What's included:
+## Archivos de Prueba
 
-- `sample-receipt-1.txt` - Example simple receipt text
-- `sample-receipt-2.txt` - Example complex receipt text
+- **`panama-receipt.png`** - Recibo de Panamá en formato PNG. Contiene estructura estándar de recibo con montos, impuestos y datos del vendedor.
 
-## How to use:
+- **`Ingreso-Derma.jpg`** - Comprobante de ingreso en formato JPG. Recibo de servicio con detalles de ingresos.
 
-1. Create receipt images from these samples (use an image editor or print to PDF)
-2. Upload them via the web UI to test your OCR
-3. Verify the parsed data matches expectations
+- **`PDF-TEST.pdf`** - Documento PDF para probar la extracción de texto desde archivos PDF.
 
----
+## Cómo Usar
 
-## Sample Receipt 1 (Simple)
+1. Sube cualquiera de estos archivos a través de la interfaz web en `http://localhost:3000`
+2. El OCR extraerá el texto del archivo
+3. El analizador extrae los datos estructurados
+4. Verifica los resultados
 
-```
-SUPERMARKET ABC
-123 Main Street
-New York, NY 10001
+## Qué Esperar
 
-Invoice #INV-2024-001234
-Date: 2024-01-15
+### panama-receipt.png
+- Recibo completo con información de vendedor
+- Montos, subtotal, impuestos
+- Información de pago
+- Datos de facturación
 
-=====================================
-Item 1: Regular Price $25.00
-Item 2: Premium Price $45.00
-Item 3: Basic Item   $10.00
+### Ingreso-Derma.jpg
+- Comprobante de ingreso/servicio
+- Detalles de concepto de pago
+- Monto e información fiscal
 
-Subtotal: $80.00
-Tax (10%): $8.00
-=====================================
-TOTAL DUE: $88.00
+### PDF-TEST.pdf
+- Documento PDF con información de transacción
+- Prueba la capacidad de Tesseract para procesar PDFs
 
-Thank you for shopping!
-```
+## Tips para Pruebas
 
-Expected extraction:
-- `vendorName`: "SUPERMARKET ABC"
-- `invoiceNumber`: "INV-2024-001234"
-- `date`: "2024-01-15"
-- `subtotalAmount`: 80.00
-- `taxAmount`: 8.00
-- `taxPercentage`: 10
-- `amount`: 88.00
+1. **Comienza con PNG/JPG** - Son más fáciles de procesar que PDFs
+2. **Verifica el OCR** - Mira el `rawText` para entender qué extrae Tesseract
+3. **Prueba el Parser** - Verifica que se extraigan correctamente: amount, vendor, fecha
+4. **Maneja Errores** - El OCR puede fallar en imágenes de mala calidad
+5. **Idiomas Múltiples** - Estos recibos contienen texto en español e inglés
 
----
+## Agregar Más Muestras
 
-## Sample Receipt 2 (Complex)
+Si quieres agregar más recibos para pruebas:
+1. Coloca las imágenes/PDFs en esta carpeta
+2. Actualiza este README con descripciones
+3. Prueba tu implementación con cada uno
 
-```
-TIENDA DEPORTIVA "EL CAMPEÓN"
-Avenida 5to 234
-Bogotá, Colombia
-
-RUC: 900123456-7
-
-FACTURA #FC-2024-005678
-Fecha: 15/01/2024 14:35
-
-=====================================
-DESCRIPCIÓN              CANTIDAD  VALOR
-Nike Shoes (Black)            1   $120.00
-Adidas Socks (Pack)           2    $15.00
-Sport Water Bottle           1    $8.50
-Gym Mat Premium              1    $45.00
-
-SubTotal:                        $188.50
-Descuento (5%):                  ($9.43)
-Subtotal Descuento:             $179.07
-IVA (16%):                       $28.65
-=====================================
-TOTAL:                          $207.72
-
-Método de pago: Tarjeta Crédito
-Transacción: 987654
-
-¡Gracias por su compra!
-```
-
-Expected extraction:
-- `vendorName`: "TIENDA DEPORTIVA EL CAMPEÓN"
-- `invoiceNumber`: "FC-2024-005678"
-- `date`: "15/01/2024" or "2024-01-15"
-- `subtotalAmount`: 179.07
-- `taxAmount`: 28.65
-- `taxPercentage`: 16
-- `amount`: 207.72
-
----
-
-## Tips for Testing:
-
-1. Start with Sample 1 (simpler patterns)
-2. Move to Sample 2 (more complex layouts)
-3. Test with real receipts from stores
-4. Try different receipt formats to improve your parser robustness
