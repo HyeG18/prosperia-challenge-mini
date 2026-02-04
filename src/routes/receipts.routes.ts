@@ -45,18 +45,52 @@ router.post('/api/receipts', upload.single('file'), async (req: Request, res: Re
       throw new AppError(400, 'No file uploaded');
     }
 
-    // TODO: Implement the receipt upload logic
-    // Steps:
-    // 1. Generate a unique ID for the receipt
-    // 2. Get OCR provider
-    // 3. Extract text from the uploaded file
-    // 4. Parse the text to extract receipt data
-    // 5. Store in the receipts map
-    // 6. Return the result
+    logger.info(`[Receipt] Processing file: ${req.file.originalname}`);
 
-    res.status(501).json({ error: 'TODO: Implement receipt upload endpoint' });
+    //Generar ID único
+    const id = uuidv4();
+
+    //Instancia el servicio de OCR (lee .env para saber si es mock o tesseract)
+    const ocrProvider = getOcrProvider(config.ocrProvider);
+
+    //Extraer texto 
+    const rawText = await ocrProvider.extractText(req.file.path);
+
+    //Analizar el texto (Task 2 - Aún pendiente, pero lo dejamos conectado)
+    const parsedData = ReceiptParser.parse(rawText);
+
+    //Construir el objeto final
+    const receiptResult: ReceiptResult = {
+      id,
+      filename: req.file.originalname,
+      uploadedAt: new Date(), //Fecha actual
+      data: parsedData,       //Datos extraídos (amount, vendor, etc.)
+    };
+
+    //Guardar en memoria
+    receipts.set(id, receiptResult);
+    logger.info(`[Receipt] Successfully processed receipt ${id}`);
+
+    /*
+      LIMPIEZA: Borrar el archivo temporal para no llenar el disco 
+      Usamos unlink de forma asíncrona y no bloqueante
+     */
+    try {
+      await fs.unlink(req.file.path);
+    } catch (cleanupError) {
+      logger.warn(`[Receipt] Failed to delete temp file: ${req.file.path}`);
+    }
+
+    // Responder al cliente
+    res.status(201).json(receiptResult);
+
   } catch (error) {
     logger.error(`[Receipt] Error uploading receipt: ${error}`);
+    // Si algo falló y el archivo se quedó almacenado, se intenta borrar por seguridad
+    if (req.file) {
+      try { await fs.unlink(req.file.path); } catch { }
+    }
+
     const appError = error instanceof AppError ? error : new AppError(500, 'Failed to process receipt');
     res.status(appError.statusCode).json({ error: appError.message });
   }
