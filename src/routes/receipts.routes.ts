@@ -2,7 +2,7 @@ import express, { Request, Response } from 'express';
 import multer from 'multer';
 import fs from 'fs/promises';
 import path from 'path';
-import { v4 as uuidv4 } from 'crypto';
+import { randomUUID as uuidv4 } from 'crypto'; 
 import { logger } from '../config/logger.js';
 import { config } from '../config/env.js';
 import { getOcrProvider } from '../services/ocr.service.js';
