@@ -2,7 +2,7 @@ import express, { Request, Response } from 'express';
 import multer from 'multer';
 import fs from 'fs/promises';
 import path from 'path';
-import { randomUUID as uuidv4 } from 'crypto'; 
+import { randomUUID as uuidv4 } from 'crypto';
 import { logger } from '../config/logger.js';
 import { config } from '../config/env.js';
 import { getOcrProvider } from '../services/ocr.service.js';
@@ -56,14 +56,14 @@ router.post('/api/receipts', upload.single('file'), async (req: Request, res: Re
     //Extraer texto 
     const rawText = await ocrProvider.extractText(req.file.path);
 
-    //Analizar el texto (Task 2 - Aún pendiente, pero lo dejamos conectado)
+    //Analizar el texto 
     const parsedData = ReceiptParser.parse(rawText);
 
     //Construir el objeto final
     const receiptResult: ReceiptResult = {
       id,
       filename: req.file.originalname,
-      uploadedAt: new Date(), //Fecha actual
+      uploadedAt: new Date().toISOString(), //Fecha actual
       data: parsedData,       //Datos extraídos (amount, vendor, etc.)
     };
 
