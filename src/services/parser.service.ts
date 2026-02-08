@@ -2,106 +2,151 @@ import { ReceiptData } from '../types/receipt.js';
 import { logger } from '../config/logger.js';
 
 export class ReceiptParser {
-  /**
-   * Helper para limpiar precios (ej: "$1,200.50" -> 1200.50)
-   */
-  private static parsePrice(text: string): number | undefined {
-    // 1. Buscamos números que parezcan precios
-    // Explicación Regex:
-    // [\d,]+   -> Busca dígitos (0-9) o comas, uno o más veces.
-    // \.       -> Busca un punto literal.
-    // \d{2}    -> Busca exactamente 2 decimales.
-    const match = text.match(/([\d,]+\.\d{2})/);
 
-    if (match) {
-      // Quitamos las comas (ej: "1,000" -> "1000") para que parseFloat funcione
-      const cleanString = match[1].replace(/,/g, '');
-      const number = parseFloat(cleanString);
-      return isNaN(number) ? undefined : number;
-    }
-    return undefined;
+  /**
+   * Determina si un año es válido (no en el futuro lejano, no muy antiguo)
+   */
+  private static isValidDate(dateStr: string): boolean {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const match = dateStr.match(/(\d{4})/);
+    if (!match) return false;
+    const year = parseInt(match[1]);
+
+    // Permitimos hasta el año actual + 1 por temas de zona horaria o error leve
+    return year >= 2000 && year <= currentYear + 1;
   }
 
   /**
-   * Método principal de análisis
+   * Parsea precios manejando formatos internacionales:
+   * Usa heurística de "3 dígitos" para distinguir miles de decimales.
    */
+  private static parsePrice(text: string): number | undefined {
+    // Limpieza: solo dejamos números, puntos y comas
+    let cleanText = text.replace(/[^\d.,]/g, '').trim();
+    // Quitamos puntuación final suelta (error OCR)
+    cleanText = cleanText.replace(/[.,]+$/, '');
+
+    if (!cleanText) return undefined;
+
+    const hasComma = cleanText.includes(',');
+    const hasDot = cleanText.includes('.');
+    let normalizedNum = cleanText;
+
+    if (hasComma && hasDot) {
+      // Si tiene ambos, el último es el decimal
+      const lastComma = cleanText.lastIndexOf(',');
+      const lastDot = cleanText.lastIndexOf('.');
+      if (lastComma > lastDot) {
+        normalizedNum = cleanText.replace(/\./g, '').replace(',', '.'); // Europa/VE
+      } else {
+        normalizedNum = cleanText.replace(/,/g, ''); // US/Panamá
+      }
+    }
+    else if (hasComma || hasDot) {
+      // Si tiene solo uno, usamos la regla de los 3 dígitos
+      const separator = hasComma ? ',' : '.';
+      const parts = cleanText.split(separator);
+      const lastPart = parts[parts.length - 1];
+
+      if (lastPart.length === 3) {
+        // "1.272" -> Probablemente miles
+        normalizedNum = cleanText.replace(new RegExp(`\\${separator}`, 'g'), '');
+      } else {
+        // "50.00" o "12.5" -> Probablemente decimal
+        normalizedNum = cleanText.replace(/,/g, '.');
+      }
+    }
+
+    const number = parseFloat(normalizedNum);
+    return isNaN(number) ? undefined : number;
+  }
+
   static parse(rawText: string): ReceiptData {
     logger.info('[Parser] Parsing receipt data...');
 
-    // Inicializamos el objeto vacío
-    const data: ReceiptData = {
-      rawText,
-    };
+    const data: ReceiptData = { rawText };
 
-    // 1. PRE-PROCESAMIENTO
-    // Dividimos el texto en líneas para analizarlo ordenadamente
-    const lines = rawText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+    // 1. LIMPIEZA DE LÍNEAS
+    const lines = rawText
+      .split('\n')
+      .map(line => line.trim())
+      // Filtramos líneas muy cortas o sin contenido alfanumérico útil
+      .filter(line => line.length > 3 && /[a-zA-Z0-9]/.test(line));
 
-    // 2. EXTRACCIÓN: VENDOR NAME (Nombre del Vendedor)
-    // Heurística: La primera línea que no esté vacía suele ser el nombre de la tienda.
-    if (lines.length > 0) {
-      data.vendorName = lines[0];
-    }
+    // 2. VENDOR NAME (Lista negra y validación)
+    const skipWords = [
+      'BIENVENIDO', 'WELCOME', 'FACTURA', 'INVOICE', 'SENIAT', 'DGI',
+      'RUC', 'RIF', 'NIT', 'FISCAL', 'ORIGINAL', 'COPIA', 'CLIENTE'
+    ];
 
-    // 3. EXTRACCIÓN: FECHA
-    // Regex: Busca DD/MM/YYYY o YYYY-MM-DD
-    // \d{1,4} -> 1 a 4 dígitos
-    // [-/.]   -> Separadores permitidos
-    const dateMatch = rawText.match(/(\d{1,4}[-/. ]\d{1,2}[-/. ]\d{2,4})/);
-    if (dateMatch) {
-      data.date = dateMatch[0];
-    }
-
-    // 4. EXTRACCIÓN: INVOICE / FACTURA
-    // Regex: Busca palabras clave como Invoice, Folio, Ticket seguidas de letras/números
-    const invoiceMatch = rawText.match(/(?:invoice|factura|folio|ticket|recibo)\s*[:#]?\s*([A-Z0-9-]+)/i);
-    if (invoiceMatch) {
-      data.invoiceNumber = invoiceMatch[1];
-    }
-
-    // 5. EXTRACCIÓN: IMPORTES (Total, Subtotal, Impuestos)
-    // Buscamos línea por línea patrones de dinero
-
-    // Convertimos a minúsculas una sola vez para buscar palabras clave sin preocuparnos por mayúsculas
-    const lowerText = rawText.toLowerCase();
-
-    // A. TOTAL
-    // Buscamos explícitamente la palabra "total" seguida de un número
-    const totalMatch = rawText.match(/total[\s\w]*[:$]?\s*([\d,]+\.\d{2})/i);
-    if (totalMatch) {
-      data.amount = this.parsePrice(totalMatch[1]);
-    }
-
-    // B. SUBTOTAL
-    const subtotalMatch = rawText.match(/(?:subtotal|sub-total)[\s\w]*[:$]?\s*([\d,]+\.\d{2})/i);
-    if (subtotalMatch) {
-      data.subtotalAmount = this.parsePrice(subtotalMatch[1]);
-    }
-
-    // C. IMPUESTOS (Tax / IVA)
-    const taxMatch = rawText.match(/(?:tax|iva|impuesto|vat)[\s\w]*[:$]?\s*([\d,]+\.\d{2})/i);
-    if (taxMatch) {
-      data.taxAmount = this.parsePrice(taxMatch[1]);
-    }
-
-    // 6. HEURÍSTICA DE RESPALDO (FALLBACK) PARA EL TOTAL
-    // Si no encontramos la palabra "TOTAL", buscamos todos los números con formato de precio
-    // y asumimos que el más grande es el total.
-    if (!data.amount) {
-      const allPrices: number[] = [];
-      // Regex global (/g) para encontrar todos los precios en el texto
-      const priceRegex = /[\$]?\s*([\d,]+\.\d{2})/g;
-      let match;
-
-      while ((match = priceRegex.exec(rawText)) !== null) {
-        const price = this.parsePrice(match[1]);
-        if (price) allPrices.push(price);
+    for (const line of lines) {
+      const upperLine = line.toUpperCase();
+      // El nombre suele ser corto y no debe contener palabras clave fiscales
+      if (!skipWords.some(word => upperLine.includes(word)) &&
+        !upperLine.match(/^(CALLE|AV|JR)\.?\s/) &&
+        line.length < 50) {
+        data.vendorName = line;
+        break;
       }
+    }
 
-      if (allPrices.length > 0) {
-        // Math.max(...array) encuentra el número más grande
-        data.amount = Math.max(...allPrices);
-        logger.info(`[Parser] Total word not found. Using max value heuristic: ${data.amount}`);
+    // 3. FECHA
+    const dateRegex = /(\d{1,4}[-/. ]\d{1,2}[-/. ]\d{2,4})/;
+    const allDateMatches = rawText.match(new RegExp(dateRegex, 'g')) || [];
+
+    for (const dateStr of allDateMatches) {
+      if (this.isValidDate(dateStr)) {
+        data.date = dateStr;
+        break;
+      }
+    }
+
+    // Fallback: Si el OCR leyó mal el año (ej: 2026), intentamos corregirlo al actual
+    if (!data.date && allDateMatches.length > 0) {
+      const badDate = allDateMatches[0];
+      if (badDate) {
+        const currentYear = new Date().getFullYear();
+        data.date = badDate.replace(/202[6-9]/, `${currentYear}`);
+      }
+    }
+
+    // 4. FACTURA / INVOICE
+    const invoiceMatch = rawText.match(/(?:factura|invoice|ticket|folio|chk|numero)\s*[:#.]?\s*([A-Z0-9-]+)/i);
+    if (invoiceMatch) data.invoiceNumber = invoiceMatch[1];
+
+    // 5. IMPORTES
+    // Patrón genérico de número (soporta 1.000,00 o 1,000.00)
+    const numberPattern = "([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]+)?)";
+
+    // TAX / IVA
+    const taxRegex = new RegExp(`(?:tax|iva|impuesto|itbms|vat)[^0-9\\n]*[:$]?\\s*${numberPattern}`, 'i');
+    const taxMatch = rawText.match(taxRegex);
+    if (taxMatch) data.taxAmount = this.parsePrice(taxMatch[1]);
+
+    // SUBTOTAL
+    const subtotalRegex = new RegExp(`(?:subtotal|sub-total)[^0-9\\n]*[:$]?\\s*${numberPattern}`, 'i');
+    const subtotalMatch = rawText.match(subtotalRegex);
+    if (subtotalMatch) data.subtotalAmount = this.parsePrice(subtotalMatch[1]);
+
+    // TOTAL
+    const totalRegex = new RegExp(`(?:total|pagar|amount|suma)[^0-9\\n]*[:$]?\\s*${numberPattern}`, 'i');
+    const totalMatch = rawText.match(totalRegex);
+    if (totalMatch) data.amount = this.parsePrice(totalMatch[1]);
+
+    // 6. FALLBACK PARA TOTAL (Busca el monto mayor)
+    if (!data.amount) {
+      const fallbackRegex = new RegExp(`\\b${numberPattern}\\b`, 'g');
+      const matches = rawText.match(fallbackRegex);
+
+      if (matches) {
+        const numericPrices = matches
+          .map(p => this.parsePrice(p))
+          .filter(p => p !== undefined && p > 0) as number[];
+
+        if (numericPrices.length > 0) {
+          data.amount = Math.max(...numericPrices);
+        }
       }
     }
 
