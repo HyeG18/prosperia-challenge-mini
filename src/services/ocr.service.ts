@@ -1,42 +1,68 @@
 import Tesseract from 'tesseract.js';
 import { logger } from '../config/logger.js';
+import fs from 'fs/promises';
+import { createRequire } from 'module';
+
+/**
+ * SOLUCIÓN DE COMPATIBILIDAD (ESM vs CommonJS):
+ * Node.js moderno usa 'import', pero 'pdf-parse' es una librería antigua (CommonJS).
+ * Al importarla directamente con 'import', Node v22 intenta buscar un 'default export' que no existe.
+ * * 'createRequire' nos permite construir una función 'require()' personalizada
+ * para cargar librerías antiguas dentro de este módulo moderno sin errores.
+ */
+const require = createRequire(import.meta.url);
+const pdf = require('pdf-parse'); 
 
 export interface OcrProvider {
   extractText(imagePath: string): Promise<string>;
 }
 
 export class TesseractOcr implements OcrProvider {
-  async extractText(imagePath: string): Promise<string> {
-    logger.info(`[OCR] Extracting text from ${imagePath} using Tesseract...`);
+
+  async extractText(filePath: string): Promise<string> {
+    logger.info(`[OCR] Processing file at ${filePath}...`);
 
     try {
-      // TODO: Implement Tesseract OCR extraction
-      // 1. Use Tesseract.recognize() to process the image file
-      // 2. Extract text from languages: 'eng+spa'
-      // 3. Return the raw extracted text
-      // 4. Handle errors appropriately
-      //
-      // Hint: Tesseract.recognize(imagePath, 'eng+spa').then(result => result.data.text)
-      
-      //1. Se implementa la llamada a Tesseract para la extraccion
-      //Se extrae el texto de los idiomas 'eng+spa' dependiendo del idioma del archivo subido
-      //Se retorna el texto extraido en una constante para su posterior manejo
-      //4. Se manejan los errores apropiadamente
-      const result = await Tesseract.recognize(imagePath, 'eng+spa');
-      
-      //2. Se extrae la data proveniente de la imagen proporcionada. 
-      const text = result.data.text;
+      // Leemos el archivo como un Buffer (datos binarios crudos) en lugar de texto.
+      // Esto es necesario para poder inspeccionar los bytes de cabecera.
+      const fileBuffer = await fs.readFile(filePath);
 
-      //3. Log verificacion de funcionamiento del servicio.
-      logger.info(`[OCR] Extraction complete. Length: ${text.length}`)
-      
-      return text;
+      /**
+       * DETECCIÓN ROBUSTA DE TIPO (Magic Bytes):
+       * No confiamos en la extensión del archivo (ej. .png, .pdf) ya que el usuario puede cambiarla.
+       * Inspeccionamos los primeros 5 bytes (cabecera) del archivo real.
+       * * - Si los bytes son "%PDF-", el archivo es garantizado un PDF real.
+       * - Si no, asumimos que es una imagen y dejamos que Tesseract intente procesarlo.
+       */
+      const isPdfHeader = fileBuffer.subarray(0, 5).toString() === '%PDF-';
 
-      //throw new Error('TODO: Implement Tesseract OCR extraction');
+      if (isPdfHeader) {
+        return await this.processPdf(fileBuffer);
+      } else {
+        return await this.processImage(filePath);
+      }
+
     } catch (error) {
       logger.error(`[OCR] Error extracting text: ${error}`);
       throw error;
     }
+  }
+
+  private async processImage(imagePath: string): Promise<string> {
+    logger.info('[OCR] Image detected. Using Tesseract engine...');
+    const result = await Tesseract.recognize(imagePath, 'eng+spa');
+    return result.data.text;
+  }
+
+  private async processPdf(dataBuffer: Buffer): Promise<string> {
+    logger.info('[OCR] PDF detected. Extracting text layer...');
+
+    // Gracias al 'require' manual del inicio, 'pdf' es ahora la función constructora correcta.
+    // Le pasamos el Buffer directamente para extraer el texto de la capa de datos.
+    const data = await pdf(dataBuffer);
+
+    logger.info(`[OCR] PDF extraction complete. Info: ${data.info?.Title || 'No title'}`);
+    return data.text.trim();
   }
 }
 
