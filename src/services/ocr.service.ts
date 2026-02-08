@@ -11,7 +11,7 @@ import { createRequire } from 'module';
  * para cargar librerías antiguas dentro de este módulo moderno sin errores.
  */
 const require = createRequire(import.meta.url);
-const pdf = require('pdf-parse'); 
+const pdf = require('pdf-parse');
 
 export interface OcrProvider {
   extractText(imagePath: string): Promise<string>;
@@ -50,22 +50,59 @@ export class TesseractOcr implements OcrProvider {
 
   private async processImage(imagePath: string): Promise<string> {
     logger.info('[OCR] Image detected. Using Tesseract engine...');
-    const result = await Tesseract.recognize(imagePath, 'eng+spa');
+    // Usamos 'spa+eng' para dar soporte a español e inglés
+    const result = await Tesseract.recognize(imagePath, 'spa+eng');
     return result.data.text;
   }
 
   private async processPdf(dataBuffer: Buffer): Promise<string> {
     logger.info('[OCR] PDF detected. Extracting text layer...');
 
-    // Gracias al 'require' manual del inicio, 'pdf' es ahora la función constructora correcta.
-    // Le pasamos el Buffer directamente para extraer el texto de la capa de datos.
-    const data = await pdf(dataBuffer);
+    /**
+     * RENDERIZADOR PERSONALIZADO (Solución al "Texto Aplastado"):
+     * Por defecto, pdf-parse une textos cercanos sin espacios (ej: Columna1Columna2).
+     * Esto rompe las Regex de precios.
+     * * Esta función intercepta el renderizado de la página para:
+     * 1. Iterar sobre cada ítem de texto individual.
+     * 2. Forzar un espacio (" ") después de CADA ítem.
+     * 3. Detectar cambios en la coordenada Y para insertar saltos de línea (\n).
+     */
+    const render_page = (pageData: any) => {
+      let render_options = {
+        normalizeWhitespace: false,
+        disableCombineTextItems: false
+      }
+
+      return pageData.getTextContent(render_options)
+        .then(function (textContent: any) {
+          let lastY, text = '';
+          for (let item of textContent.items) {
+            // Si cambia la posición Y, es nueva línea. Si no, es la misma línea.
+            if (lastY == item.transform[5] || !lastY) {
+              text += item.str + " "; // <-- ESPACIO FORZADO
+            }
+            else {
+              text += '\n' + item.str + " ";
+            }
+            lastY = item.transform[5];
+          }
+          return text;
+        });
+    }
+
+    const options = {
+      pagerender: render_page
+    };
+
+    const data = await pdf(dataBuffer, options);
+
+    // Limpieza final: reducir múltiples espacios a uno solo
+    const cleanText = data.text.replace(/  +/g, ' ').trim();
 
     logger.info(`[OCR] PDF extraction complete. Info: ${data.info?.Title || 'No title'}`);
-    return data.text.trim();
+    return cleanText;
   }
 }
-
 export class MockOcr implements OcrProvider {
   async extractText(_imagePath: string): Promise<string> {
     logger.info('[OCR] Using mock OCR provider');
