@@ -37,6 +37,12 @@ Esta carpeta contiene muestras de recibos reales que puedes usar para probar tu 
 - Documento PDF con información de transacción
 - Prueba la capacidad de Tesseract para procesar PDFs
 
+### factura santo tome.jpeg
+
+- Recibo de Venezuela en formato JPEG.
+- Contiene estructura estándar de recibo con montos, impuestos y datos del vendedor.
+
+
 ## Tips para Pruebas
 
 1. **Comienza con PNG/JPG** - Son más fáciles de procesar que PDFs
